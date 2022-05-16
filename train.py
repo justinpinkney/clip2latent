@@ -4,12 +4,15 @@ from pathlib import Path
 import sys
 import wandb
 import yaml
+import hydra
+from omegaconf import DictConfig, OmegaConf
 
 import clip
 import torch
 from tqdm.auto import tqdm
 
 from dalle2_pytorch import DiffusionPriorNetwork
+from dalle2_pytorch.train import DiffusionPriorTrainer
 
 sys.path.append("stylegan3")
 import dnnlib
@@ -79,7 +82,7 @@ def train_step(diffusion_prior, device, batch):
     return loss
 
     
-def train(diffusion_prior, opt, loader, device, stats, G, clip_model, val_data, val_it, print_it, save_checkpoint, max_it):
+def train(diffusion_prior, trainer, loader, device, stats, G, clip_model, val_data, val_it, print_it, save_checkpoint, max_it, add_noise=False):
     
     current_it = 0
     current_epoch = 0
@@ -91,28 +94,40 @@ def train(diffusion_prior, opt, loader, device, stats, G, clip_model, val_data, 
         for batch in pbar:
 
             if current_it % val_it == 0:
-                validation(current_it, device, diffusion_prior, stats, G, clip_model, val_data)
+                validation(current_it, device, trainer, stats, G, clip_model, val_data)
 
-            loss = train_step(diffusion_prior, device, batch)
+
+            diffusion_prior.train()
+            trainer.train()
+            batch_clip, batch_latent = batch
+            if add_noise:
+                orig_norm = batch_clip.norm(dim=-1, keepdim=True)
+                batch_clip = batch_clip/orig_norm
+                noise = torch.randn_like(batch_clip)
+                noise /= noise.norm(dim=-1, keepdim=True)
+                batch_clip += 0.75*noise
+                batch_clip /= batch_clip.norm(dim=-1, keepdim=True)*orig_norm
+            input_args = {
+                "image_embed": batch_latent.to(device),
+                "text_embed": batch_clip.to(device)
+            }
+            loss = trainer(**input_args)
 
             if (current_it % print_it == 0):
-                wandb.log({'loss': loss.item()}, step=current_it)
+                wandb.log({'loss': loss}, step=current_it)
             
-            opt.step()
-            opt.zero_grad()
+            trainer.update()
             current_it += 1
-            pbar.set_postfix({"epoch": current_epoch, "it": current_it})
+            pbar.set_postfix({"loss": loss, "epoch": current_epoch, "it": current_it})
 
             save_checkpoint(diffusion_prior, current_it)
 
         current_epoch += 1
 
 
-if __name__ == "__main__":
+@hydra.main(config_path="config", config_name="config")
+def main(cfg):
 
-    with open("config.yaml", "rt") as f:
-        cfg = yaml.safe_load(f)
-        
     wandb.init(
         project="clip2latent",
         config=cfg,
@@ -125,8 +140,8 @@ if __name__ == "__main__":
     diffusion_prior = ZWPrior(prior_network, **cfg["model"]["diffusion"]).to(device)
     diffusion_prior.cfg = cfg
 
-    z = torch.load(cfg["data"]["clip_feature_path"])
-    w = torch.load(cfg["data"]["latent_path"])
+    z = torch.load(hydra.utils.to_absolute_path(cfg["data"]["clip_feature_path"]))
+    w = torch.load(hydra.utils.to_absolute_path(cfg["data"]["latent_path"]))
 
     stats = {
         "w": train_utils.make_data_stats(w),
@@ -147,11 +162,19 @@ if __name__ == "__main__":
         "val_text": make_text_val_data(G, clip_model, cfg["val"]["text_val_samples"], device),
     }
 
-    ds = torch.utils.data.TensorDataset(z, w_norm)
+    ds = torch.utils.data.TensorDataset(z.to(device), w_norm.to(device))
     loader = torch.utils.data.DataLoader(ds, batch_size=cfg["data"]["bs"], shuffle=True, drop_last=True)
-    opt = torch.optim.AdamW(prior_network.parameters(), **cfg["train"]["opt"])
+
+    trainer = DiffusionPriorTrainer(
+        diffusion_prior=diffusion_prior,
+        lr=cfg["train"]["opt"]["lr"],
+        wd = cfg["train"]["opt"]["weight_decay"],
+    ).to(device)
     
     checkpoint_dir = f"checkpoints/{datetime.now():%Y%m%d-%H%M%S}"
     checkpointer = Checkpointer(checkpoint_dir, cfg["train"]["loop"]["val_it"])
 
-    train(diffusion_prior, opt, loader, device, stats, G, clip_model, val_data, **cfg["train"]["loop"], save_checkpoint=checkpointer.save_checkpoint)
+    train(diffusion_prior, trainer, loader, device, stats, G, clip_model, val_data, **cfg["train"]["loop"], save_checkpoint=checkpointer.save_checkpoint)
+
+if __name__ == "__main__":
+    main()

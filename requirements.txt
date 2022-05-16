@@ -3,3 +3,4 @@ torchvision
 wandb
 ninja
 dalle2-pytorch==0.2.38
+hydra-core
