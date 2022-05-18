@@ -130,7 +130,7 @@ def main(cfg):
 
     wandb.init(
         project="clip2latent",
-        config=cfg,
+        config=OmegaConf.to_container(cfg),
         entity="justinpinkney",
     )
     # Load model
