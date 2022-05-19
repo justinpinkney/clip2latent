@@ -120,7 +120,7 @@ def train(diffusion_prior, trainer, loader, device, stats, G, clip_model, val_da
             current_it += 1
             pbar.set_postfix({"loss": loss, "epoch": current_epoch, "it": current_it})
 
-            save_checkpoint(diffusion_prior, current_it)
+            save_checkpoint(trainer, current_it)
 
         current_epoch += 1
 
