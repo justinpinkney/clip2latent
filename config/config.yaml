@@ -1,22 +1,12 @@
+defaults:
+  - model: small
+
 device: "cuda:0"
-model:
-  network:
-    dim: 512
-    num_timesteps: 1000
-    depth: 6
-    dim_head: 64
-    heads: 8
-  diffusion:
-    image_embed_dim: 512
-    timesteps: 1000
-    cond_drop_prob: 0.2
-    image_embed_scale: 1.0
-    beta_schedule: "cosine"
-    predict_x_start: True
 data:
   bs: 32
-  clip_feature_path: "data/sg2-ffhq-1024/clip_features.pt"
-  latent_path: 'data/sg2-ffhq-1024/w_for_clip.pt'
+  format: webdataset
+  path: test_data/webdataset/{00000..1}.tar
+  noise_scale: 0.75
   sg_pkl: 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan2/versions/1/files/stylegan2-ffhq-1024x1024.pkl'
   clip_variant: "ViT-B/32"
 val:
@@ -36,7 +26,7 @@ train:
     print_it: 100
     max_it: 1000000
     val_it: 5000
-    noise: false
+    add_noise: false
   opt:
     lr: 3.0e-4
     weight_decay: 1.0e-2
