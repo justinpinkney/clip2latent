@@ -1,0 +1,13 @@
+network:
+  dim: 512
+  num_timesteps: 1000
+  depth: 12
+  dim_head: 64
+  heads: 12
+diffusion:
+  image_embed_dim: 512
+  timesteps: 1000
+  cond_drop_prob: 0.2
+  image_embed_scale: 1.0
+  beta_schedule: "cosine"
+  predict_x_start: True

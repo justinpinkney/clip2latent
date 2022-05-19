@@ -140,17 +140,6 @@ def main(cfg):
     diffusion_prior = ZWPrior(prior_network, **cfg["model"]["diffusion"]).to(device)
     diffusion_prior.cfg = cfg
 
-    z = torch.load(hydra.utils.to_absolute_path(cfg["data"]["clip_feature_path"]))
-    w = torch.load(hydra.utils.to_absolute_path(cfg["data"]["latent_path"]))
-
-    stats = {
-        "w": train_utils.make_data_stats(w),
-        "clip_features": train_utils.make_data_stats(z),
-    }
-
-    w_norm = train_utils.normalise_data(w, *stats["w"])
-    # Doesn't seem to work well if we norm z
-    # z_norm = train_utils.normalise_data(z, *stats["clip_features"])
 
     # Load eval models
     with dnnlib.util.open_url(cfg["data"]["sg_pkl"]) as f:
@@ -162,8 +151,8 @@ def main(cfg):
         "val_text": make_text_val_data(G, clip_model, cfg["val"]["text_val_samples"], device),
     }
 
-    ds = torch.utils.data.TensorDataset(z.to(device), w_norm.to(device))
-    loader = torch.utils.data.DataLoader(ds, batch_size=cfg["data"]["bs"], shuffle=True, drop_last=True)
+
+    stats, loader = load_data(cfg.data)
 
     trainer = DiffusionPriorTrainer(
         diffusion_prior=diffusion_prior,
@@ -175,6 +164,47 @@ def main(cfg):
     checkpointer = Checkpointer(checkpoint_dir, cfg["train"]["loop"]["val_it"])
 
     train(diffusion_prior, trainer, loader, device, stats, G, clip_model, val_data, **cfg["train"]["loop"], save_checkpoint=checkpointer.save_checkpoint)
+
+import webdataset as wds
+from functools import partial
+
+import numpy as np
+
+def identity(x):
+    return x
+
+def add_noise(x, scale=0.75):
+    x += scale*torch.randn_like(x)
+    return x
+
+def load_data(cfg):
+    if cfg.format != "webdataset":
+        raise NotImplementedError()
+
+    n_stats = 10_000
+    data_path = hydra.utils.to_absolute_path(cfg.path)
+    stats_ds = wds.WebDataset(data_path).decode().to_tuple('img_feat.npy', 'latent.npy').shuffle(1000).batched(n_stats)
+    stats_data = next(stats_ds.__iter__())
+    
+    stats = {
+        "clip_features": train_utils.make_data_stats(torch.tensor(stats_data[0])),
+        "w": train_utils.make_data_stats(torch.tensor(stats_data[1])),
+    }
+
+    ds = (
+        wds.WebDataset(data_path)
+            .decode()
+            .to_tuple('img_feat.npy', 'latent.npy')
+            .batched(cfg.bs)
+            .map_tuple(torch.tensor, torch.tensor)
+        )
+    if cfg.noise_scale > 0:
+        ds = ds.map_tuple(partial(add_noise, scale=cfg.noise_scale), identity)
+    ds = ds.map_tuple(identity, partial(train_utils.normalise_data, w_mean=stats["w"][0], w_std=stats["w"][1]))
+
+    # Doesn't seem to work well if we norm z
+    loader = wds.WebLoader(ds, num_workers=8, batch_size=None)
+    return stats,loader
 
 if __name__ == "__main__":
     main()
