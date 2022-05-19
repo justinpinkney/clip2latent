@@ -28,6 +28,7 @@ def load_sg(network_pkl):
 
 generators = {
     "sg2-ffhq-1024": partial(load_sg, 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan2/versions/1/files/stylegan2-ffhq-1024x1024.pkl'),
+    "sg3-lhq-256": partial(load_sg, 'data/models/lhq-256-stylegan3-t-25Mimg.pkl'),
 }
 
 @torch.no_grad()
