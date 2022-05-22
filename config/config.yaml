@@ -5,7 +5,7 @@ device: "cuda:0"
 data:
   bs: 32
   format: webdataset
-  path: test_data/webdataset/{00000..1}.tar
+  path: data/webdataset/sg2-ffhq-1024-clip/{00000..99}.tar
   noise_scale: 0.75
   sg_pkl: 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan2/versions/1/files/stylegan2-ffhq-1024x1024.pkl'
   clip_variant: "ViT-B/32"
@@ -26,7 +26,6 @@ train:
     print_it: 100
     max_it: 1000000
     val_it: 5000
-    add_noise: false
   opt:
     lr: 3.0e-4
     weight_decay: 1.0e-2

@@ -2,6 +2,7 @@ from datetime import datetime
 import logging
 from pathlib import Path
 import sys
+from tkinter import X
 import wandb
 import yaml
 import hydra
@@ -82,7 +83,7 @@ def train_step(diffusion_prior, device, batch):
     return loss
 
     
-def train(diffusion_prior, trainer, loader, device, stats, G, clip_model, val_data, val_it, print_it, save_checkpoint, max_it, add_noise=False):
+def train(diffusion_prior, trainer, loader, device, stats, G, clip_model, val_data, val_it, print_it, save_checkpoint, max_it):
     
     current_it = 0
     current_epoch = 0
@@ -100,13 +101,7 @@ def train(diffusion_prior, trainer, loader, device, stats, G, clip_model, val_da
             diffusion_prior.train()
             trainer.train()
             batch_clip, batch_latent = batch
-            if add_noise:
-                orig_norm = batch_clip.norm(dim=-1, keepdim=True)
-                batch_clip = batch_clip/orig_norm
-                noise = torch.randn_like(batch_clip)
-                noise /= noise.norm(dim=-1, keepdim=True)
-                batch_clip += 0.75*noise
-                batch_clip /= batch_clip.norm(dim=-1, keepdim=True)*orig_norm
+            
             input_args = {
                 "image_embed": batch_latent.to(device),
                 "text_embed": batch_clip.to(device)
@@ -174,7 +169,12 @@ def identity(x):
     return x
 
 def add_noise(x, scale=0.75):
-    x += scale*torch.randn_like(x)
+    orig_norm = x.norm(dim=-1, keepdim=True)
+    x = x/orig_norm
+    noise = torch.randn_like(x)
+    noise /= noise.norm(dim=-1, keepdim=True)
+    x += scale*noise
+    x /= x.norm(dim=-1, keepdim=True)*orig_norm
     return x
 
 def load_data(cfg):
@@ -183,7 +183,7 @@ def load_data(cfg):
 
     n_stats = 10_000
     data_path = hydra.utils.to_absolute_path(cfg.path)
-    stats_ds = wds.WebDataset(data_path).decode().to_tuple('img_feat.npy', 'latent.npy').shuffle(1000).batched(n_stats)
+    stats_ds = wds.WebDataset(data_path).decode().to_tuple('img_feat.npy', 'latent.npy').shuffle(5000).batched(n_stats)
     stats_data = next(stats_ds.__iter__())
     
     stats = {
@@ -193,6 +193,7 @@ def load_data(cfg):
 
     ds = (
         wds.WebDataset(data_path)
+            .shuffle(5000)
             .decode()
             .to_tuple('img_feat.npy', 'latent.npy')
             .batched(cfg.bs)
@@ -203,7 +204,7 @@ def load_data(cfg):
     ds = ds.map_tuple(identity, partial(train_utils.normalise_data, w_mean=stats["w"][0], w_std=stats["w"][1]))
 
     # Doesn't seem to work well if we norm z
-    loader = wds.WebLoader(ds, num_workers=8, batch_size=None)
+    loader = wds.WebLoader(ds, num_workers=16, batch_size=None)
     return stats,loader
 
 if __name__ == "__main__":

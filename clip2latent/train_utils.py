@@ -4,6 +4,7 @@ from tqdm.auto import tqdm
 import clip
 from PIL import Image
 import torchvision
+from torchvision import transforms
 
 def make_data_stats(w):
     w_mean = w.mean(dim=0)
@@ -38,12 +39,13 @@ def make_grid(ims, pil=True):
 def make_image_val_data(G, clip_model, n_im_val_samples, device):
     clip_features = []
 
+    normalize = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
     zs = torch.randn((n_im_val_samples, 512), device=device)
     ws = G.mapping(zs, c=None)
     for w in tqdm(ws):
         out = G.synthesis(w.unsqueeze(0))
-        clip_in = F.interpolate(out, (224,224))
-        image_features = clip_model.encode_image(clip_in)
+        clip_in = 0.5*F.interpolate(out, (224,224)) + 0.5
+        image_features = clip_model.encode_image(normalize(clip_in).clamp(0,1))
         clip_features.append(image_features)
 
     clip_features = torch.cat(clip_features, dim=0)
@@ -65,6 +67,8 @@ def make_text_val_data(G, clip_model, text_samples, device):
 
 @torch.no_grad()
 def compute_val(diffusion, val_im, G, clip_model, device, stats, cond_scale=1):
+
+    normalize = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
     diffusion.eval()
     images = []
     inp = val_im["clip_features"].to(device)
@@ -75,8 +79,8 @@ def compute_val(diffusion, val_im, G, clip_model, device, stats, cond_scale=1):
     for w in tqdm(pred_w):
         out = G.synthesis(w.tile(1,18,1))
         images.append(out)
-        clip_in = F.interpolate(out, (224,224))
-        image_features = clip_model.encode_image(clip_in)
+        clip_in = 0.5*F.interpolate(out, (224,224), mode="area") + 0.5
+        image_features = clip_model.encode_image(normalize(clip_in).clamp(0,1))
         pred_w_clip_features.append(image_features)
 
     pred_w_clip_features = torch.cat(pred_w_clip_features, dim=0)
