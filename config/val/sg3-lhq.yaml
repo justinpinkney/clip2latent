@@ -1,0 +1,11 @@
+n_im_val_samples: 16
+text_val_samples: [
+    "A photograph of a beautiful beach in paradise",
+    "Snowy mountains against a blue sky",
+    "a landscape painting by J M W Turner",
+    "A lighthouse in stormy seas",
+    "A wonderful sunset",
+    "A photograph of the grand canyon",
+    "A moody haunted forest",
+    "The land of Mordor",
+]

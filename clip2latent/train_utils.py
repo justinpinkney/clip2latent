@@ -77,7 +77,7 @@ def compute_val(diffusion, val_im, G, clip_model, device, stats, cond_scale=1):
     pred_w_clip_features = []
     pred_w = denormalise_data(out, *stats["w"])
     for w in tqdm(pred_w):
-        out = G.synthesis(w.tile(1,18,1))
+        out = G.synthesis(w.tile(1,16,1)) # TODO make configurable
         images.append(out)
         clip_in = 0.5*F.interpolate(out, (224,224), mode="area") + 0.5
         image_features = clip_model.encode_image(normalize(clip_in).clamp(0,1))

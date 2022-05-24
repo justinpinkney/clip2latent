@@ -1,26 +1,9 @@
 defaults:
   - model: small
+  - data: sg2-ffhq
+  - val: sg2-ffhq
 
 device: "cuda:0"
-data:
-  bs: 32
-  format: webdataset
-  path: data/webdataset/sg2-ffhq-1024-clip/{00000..99}.tar
-  noise_scale: 0.75
-  sg_pkl: 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan2/versions/1/files/stylegan2-ffhq-1024x1024.pkl'
-  clip_variant: "ViT-B/32"
-val:
-  n_im_val_samples: 16
-  text_val_samples: [
-      "A photograph of a young man's with a beard",
-      "A photograph of a old woman's face with grey hair",
-      "A photograph of a child at a birthday party",
-      "A picture of a face outside in bright sun in front of green grass",
-      "This man has bangs arched eyebrows curly hair and a small nose",
-      "A photo of Barack Obama",
-      "An arctic explorer",
-      "A clown's face covered in make up",
-  ]
 train:
   loop:
     print_it: 100

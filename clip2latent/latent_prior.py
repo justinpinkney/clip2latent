@@ -2,12 +2,41 @@
 import torch
 from einops import rearrange, repeat
 from tqdm import tqdm
+import torch.nn.functional as F
 
 from dalle2_pytorch.dalle2_pytorch import (BaseGaussianDiffusion, DiffusionPrior, eval_decorator, 
                                            l2norm, noise_like)
 
 
 class ZWPrior(DiffusionPrior):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.skip_timesteps = 1
+
+    def set_timestep_skip(self, skip):
+        self.skip_timesteps = skip
+        last_alpha_cumprod = 1.0
+        new_betas = []
+        for i, alpha_cumprod in enumerate(self.alphas_cumprod):
+            if i%skip == 0:
+                new_betas.append(1 - alpha_cumprod / last_alpha_cumprod)
+                last_alpha_cumprod = alpha_cumprod
+        new_betas = torch.tensor(new_betas)
+
+        betas = new_betas
+        alphas = 1. - betas
+        alphas_cumprod = torch.cumprod(alphas, axis = 0)
+        alphas_cumprod_prev = F.pad(alphas_cumprod[:-1], (1, 0), value = 1.)
+
+        posterior_variance = betas * (1. - alphas_cumprod_prev) / (1. - alphas_cumprod)
+        posterior_mean_coef1 = betas * torch.sqrt(alphas_cumprod_prev) / (1. - alphas_cumprod)
+        posterior_mean_coef2 = (1. - alphas_cumprod_prev) * torch.sqrt(alphas) / (1. - alphas_cumprod)
+
+        self.posterior_variance[::skip] = posterior_variance
+        self.posterior_mean_coef1[::skip] = posterior_mean_coef1
+        self.posterior_mean_coef2[::skip] = posterior_mean_coef2
+
     def forward(self, text_embed=None, image_embed=None, *args, **kwargs):
         text_cond = dict(text_embed = text_embed)
 
@@ -21,6 +50,23 @@ class ZWPrior(DiffusionPrior):
         # calculate forward loss
 
         return self.p_losses(image_embed, times, text_cond = text_cond, *args, **kwargs)
+
+    @torch.no_grad()
+    def p_sample_loop(self, shape, text_cond, cond_scale = 1.):
+        skip = self.skip_timesteps
+        device = self.betas.device
+
+        b = shape[0]
+        image_embed = torch.randn(shape, device=device)
+
+        if self.init_image_embed_l2norm:
+            image_embed = l2norm(image_embed) * self.image_embed_scale
+
+        for i in tqdm(reversed(range(0, self.num_timesteps, skip)), desc='sampling loop time step', total=self.num_timesteps//skip):
+            times = torch.full((b,), i, device = device, dtype = torch.long)
+            image_embed = self.p_sample(image_embed, times, text_cond = text_cond, cond_scale = cond_scale)
+        return image_embed
+
 
 
 class LatentPriorNetwork(torch.nn.Module):
