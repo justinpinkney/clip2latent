@@ -10,6 +10,6 @@ train:
     max_it: 1000000
     val_it: 5000
   opt:
-    lr: 3.0e-4
+    lr: 1.0e-4
     weight_decay: 1.0e-2
     betas: [0.9, 0.999]

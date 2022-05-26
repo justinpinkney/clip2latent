@@ -22,7 +22,7 @@ import torch
 
 from clip2latent import train_utils
 from clip2latent.train_utils import compute_val, make_grid, make_image_val_data, make_text_val_data
-from clip2latent.latent_prior import ZWPrior
+from clip2latent.latent_prior import WPlusPriorNetwork, ZWPrior
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ def validation(current_it, device, diffusion_prior, stats, G, clip_model, val_da
     wandb.log({'val/text': val}, step=current_it)
     wandb.log({'val/image/text2im': wandb.Image(make_grid(ims))}, step=current_it)
 
-    text_result, ims = compute_val(diffusion_prior, val_data["val_text"], G, clip_model, device, stats, cond_scale=1.5)
+    text_result, ims = compute_val(diffusion_prior, val_data["val_text"], G, clip_model, device, stats, cond_scale=3.0)
     val = text_result.mean()
     wandb.log({'val/text-super': val}, step=current_it)
     wandb.log({'val/image/text2im-super': wandb.Image(make_grid(ims))}, step=current_it)
@@ -131,7 +131,7 @@ def main(cfg):
     # Load model
     device = cfg["device"]
 
-    prior_network = DiffusionPriorNetwork(**cfg["model"]["network"]).to(device)
+    prior_network = WPlusPriorNetwork(n_latents=18, **cfg["model"]["network"]).to(device)
     diffusion_prior = ZWPrior(prior_network, **cfg["model"]["diffusion"]).to(device)
     diffusion_prior.cfg = cfg
 
@@ -182,7 +182,10 @@ def load_data(cfg):
         raise NotImplementedError()
 
     n_stats = 10_000
-    data_path = hydra.utils.to_absolute_path(cfg.path)
+    try:
+        data_path = hydra.utils.to_absolute_path(cfg.path)
+    except TypeError:
+        data_path = [hydra.utils.to_absolute_path(x) for x in cfg.path]
     stats_ds = wds.WebDataset(data_path).decode().to_tuple('img_feat.npy', 'latent.npy').shuffle(5000).batched(n_stats)
     stats_data = next(stats_ds.__iter__())
     

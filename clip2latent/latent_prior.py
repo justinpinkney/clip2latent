@@ -67,56 +67,92 @@ class ZWPrior(DiffusionPrior):
             image_embed = self.p_sample(image_embed, times, text_cond = text_cond, cond_scale = cond_scale)
         return image_embed
 
+from dalle2_pytorch.dalle2_pytorch import exists, prob_mask_like, DiffusionPriorNetwork
+from torch import nn
 
-
-class LatentPriorNetwork(torch.nn.Module):
-    def __init__(self, latent_dim, embed_dim, n_layers, num_timesteps, spatial=False):
-        super().__init__()
-        self.latent_dim = latent_dim
-        self.embed_dim = embed_dim
-        self.dims = latent_dim + embed_dim
-        self.n_layers = n_layers
-        # self.time_embeddings = torch.nn.Embedding(num_timesteps, latent_dim)
-
-        in_ch = 32
-        out_ch = 32
-        self.in_layer = torch.nn.Sequential(
-            torch.nn.Conv1d(2, in_ch, 1)
-        )
+class WPlusPriorNetwork(DiffusionPriorNetwork):
+    def __init__(
+        self,
+        dim,
+        num_timesteps = None,
+        n_latents = 18,
+        **kwargs
+    ):
+        super().__init__(dim, num_timesteps=num_timesteps, **kwargs)
+        self.n_latents = n_latents
+        self.learned_query = nn.Parameter(torch.randn(self.n_latents, dim))
         
-        self.layers = torch.nn.ModuleList()
-        for i in range(n_layers):
+    def forward(
+        self,
+        image_embed,
+        diffusion_timesteps,
+        *,
+        text_embed,
+        text_encodings = None,
+        mask = None,
+        cond_drop_prob = 0.
+    ):
+        # For w plus the image embed is now batchxn_layersx512
+        batch, n_latents, dim, device, dtype = *image_embed.shape, image_embed.device, image_embed.dtype
+        assert self.n_latents == n_latents, "N latents don't match"
 
-            if spatial:
-                conv = torch.nn.Conv1d(in_ch, out_ch, 1)
-            else:
-                conv = torch.nn.Conv1d(in_ch, out_ch, 5, padding=2)
+        num_time_embeds, num_image_embeds, num_text_embeds = self.num_time_embeds, self.num_image_embeds, self.num_text_embeds
 
-            block = torch.nn.Sequential(
-                conv,
-                torch.nn.GroupNorm(32, out_ch),
-                torch.nn.SiLU(),
-                )
-            in_ch = out_ch
-            self.layers.append(block)
+        text_embed = self.to_text_embeds(text_embed)
+        # Don't do this
+        # image_embed = self.to_image_embeds(image_embed)
 
-        self.out_layer = torch.nn.Conv1d(out_ch, 1, 1)
+        # make text encodings optional
+        # although the paper seems to suggest it is present <--
 
-            
-    def forward(self, x, times, embed=None, cond_drop_prob=0.2):
-        #TODO cond drop
-        # TODO times
-        # embed = torch.zeros_like(embed)
+        if not exists(text_encodings):
+            text_encodings = torch.empty((batch, 0, dim), device = device, dtype = dtype)
+
+        assert not mask, "why mask!?"
         
-        times = torch.tile(times.unsqueeze(-1).unsqueeze(-1), (1, 1, x.shape[1]))
-        x = torch.cat((x.unsqueeze(1), times), dim=1)
-        x = self.in_layer(x)
-        for block in self.layers:
-            x = x + block(x)
-        x = self.out_layer(x)
-        x = x.squeeze(1)
-        return x
+        if not exists(mask):
+            mask = torch.ones((batch, text_encodings.shape[-2]), device = device, dtype = torch.bool)
 
+        # classifier free guidance
+
+        keep_mask = prob_mask_like((batch,), 1 - cond_drop_prob, device = device)
+        keep_mask = rearrange(keep_mask, 'b -> b 1')
+
+        mask &= keep_mask
+        
+        # whether text embedding is masked or not depends on the classifier free guidance conditional masking
+
+        keep_mask = repeat(keep_mask, 'b 1 -> b n', n = num_text_embeds)
+        mask = torch.cat((mask, keep_mask), dim = 1)
+
+        # whether text embedding is used for conditioning depends on whether text encodings are available for attention (for classifier free guidance, even though it seems from the paper it was not used in the prior ddpm, as the objective is different)
+        # but let's just do it right
+
+        if exists(mask):
+            attend_padding = 1 + num_time_embeds + num_image_embeds + 2*n_latents - 2 # 1 for learned queries + number of image embeds + time embeds
+            mask = F.pad(mask, (0, attend_padding), value = True) # extend mask for text embedding, noised image embedding, time step embedding, and learned query
+
+        time_embed = self.to_time_embeds(diffusion_timesteps)
+
+        learned_queries = repeat(self.learned_query, 'l d -> b l d', b = batch)
+
+        tokens = torch.cat((
+            text_encodings,
+            text_embed,
+            time_embed,
+            image_embed,
+            learned_queries
+        ), dim = -2)
+
+        # attend
+
+        tokens = self.causal_transformer(tokens, mask = mask)
+
+        # get learned query, which should predict the image embedding (per DDPM timestep)
+
+        pred_image_embed = tokens[..., -n_latents:, :]
+
+        return pred_image_embed
 
 from dalle2_pytorch.dalle2_pytorch import default
 

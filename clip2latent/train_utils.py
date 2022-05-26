@@ -23,8 +23,9 @@ def denormalise_data(w, w_mean, w_std):
     w = w + w_mean.to(device)
     return w
 
-def make_grid(ims, pil=True):
-    ims = F.interpolate(ims, size=(256,256))
+def make_grid(ims, pil=True, resize=True):
+    if resize:
+        ims = F.interpolate(ims, size=(256,256))
     grid = torchvision.utils.make_grid(
         ims.clamp(-1,1), 
         normalize=True,
@@ -72,12 +73,12 @@ def compute_val(diffusion, val_im, G, clip_model, device, stats, cond_scale=1):
     diffusion.eval()
     images = []
     inp = val_im["clip_features"].to(device)
-    out = diffusion.p_sample_loop(inp.shape, {"text_embed": inp}, cond_scale=cond_scale)
+    out = diffusion.p_sample_loop((inp.shape[0], 18,512), {"text_embed": inp}, cond_scale=cond_scale)
 
     pred_w_clip_features = []
     pred_w = denormalise_data(out, *stats["w"])
     for w in tqdm(pred_w):
-        out = G.synthesis(w.tile(1,16,1)) # TODO make configurable
+        out = G.synthesis(w.unsqueeze(0))#.tile(1,16,1)) # TODO make configurable
         images.append(out)
         clip_in = 0.5*F.interpolate(out, (224,224), mode="area") + 0.5
         image_features = clip_model.encode_image(normalize(clip_in).clamp(0,1))
