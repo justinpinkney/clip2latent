@@ -131,7 +131,7 @@ def main(cfg):
     # Load model
     device = cfg["device"]
 
-    prior_network = WPlusPriorNetwork(n_latents=18, **cfg["model"]["network"]).to(device)
+    prior_network = WPlusPriorNetwork(n_latents=3, **cfg["model"]["network"]).to(device)
     diffusion_prior = ZWPrior(prior_network, **cfg["model"]["diffusion"]).to(device)
     diffusion_prior.cfg = cfg
 
