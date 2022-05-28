@@ -22,7 +22,7 @@ import torch
 
 from clip2latent import train_utils
 from clip2latent.train_utils import compute_val, make_grid, make_image_val_data, make_text_val_data
-from clip2latent.latent_prior import WPlusPriorNetwork, ZWPrior
+from clip2latent.latent_prior import WPlusPriorNetwork, LatentPrior
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ def main(cfg):
     device = cfg["device"]
 
     prior_network = WPlusPriorNetwork(n_latents=3, **cfg["model"]["network"]).to(device)
-    diffusion_prior = ZWPrior(prior_network, **cfg["model"]["diffusion"]).to(device)
+    diffusion_prior = LatentPrior(prior_network, **cfg["model"]["diffusion"]).to(device)
     diffusion_prior.cfg = cfg
 
 
