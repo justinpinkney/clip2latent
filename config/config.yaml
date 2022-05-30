@@ -1,3 +1,6 @@
+defaults:
+  - model: mid
+  - data: sg2-ffhq
 
 wandb_project: clip2latent
 wandb_entity: null
@@ -12,33 +15,3 @@ train:
   weight_decay: 1.0e-2
   ema_update_every: 1
   ema_beta: 0.99999
-
-model:
-  network:
-    dim: 512
-    num_timesteps: 1000
-    depth: 12
-    dim_head: 64
-    heads: 12
-  diffusion:
-    image_embed_dim: 512
-    timesteps: 1000
-    cond_drop_prob: 0.2
-    image_embed_scale: 1.0
-    text_embed_scale: 1.0
-    beta_schedule: "cosine"
-    predict_x_start: True
-
-data:
-  bs: 32
-  format: webdataset
-  path: data/webdataset/sg2-ffhq-1024-clip/{00000..99}.tar
-  embed_noise_scale: 0.75
-  sg_pkl: 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan2/versions/1/files/stylegan2-ffhq-1024x1024.pkl'
-  clip_variant: "ViT-B/32"
-  n_latents: 1
-  latent_dim: 512
-  latent_repeats: [18]
-  val_im_samples: 64
-  val_text_samples: data/text/face-val.txt
-  val_samples_per_text: 4
