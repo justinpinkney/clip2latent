@@ -59,7 +59,10 @@ class LatentPrior(DiffusionPrior):
         self.register_buffer("embed_mean", embed_stats[0])
         self.register_buffer("embed_std", embed_stats[1])
         self.num_latents = num_latents
-        self.latent_repeats = latent_repeats
+        assert self.num_latents == len(latent_repeats), \
+            f"Number of latents ({num_latents}) and length of repeats ({len(latent_repeats)}) don't match"
+        latent_repeats = torch.tensor(latent_repeats).to(torch.long)
+        self.register_buffer("latent_repeats", latent_repeats)
 
     def set_timestep_skip(self, skip):
         """Support simple timestep respacing allowing a skip factor"""
@@ -108,6 +111,7 @@ class LatentPrior(DiffusionPrior):
         skip = self.skip_timesteps
         device = self.betas.device
 
+        b = shape[0]
         image_embed = torch.randn(shape, device=device)
 
         if self.init_image_embed_l2norm:
@@ -139,12 +143,12 @@ class LatentPrior(DiffusionPrior):
         latents = self.p_sample_loop(shape, cond, cond_scale=cond_scale)
 
         # Denormalise
-        latents /= self.image_embed_scale
+        latents = latents/self.image_embed_scale
         if exists(self.latent_mean):
             latents = denormalise_data(latents, self.latent_mean, self.latent_std)
 
         # Reformat for StyleGAN
-        if self.num_latents == 0:
+        if self.num_latents == 1:
             latents = latents.unsqueeze(1)
         latents = latents.repeat_interleave(self.latent_repeats, dim=1)
         
