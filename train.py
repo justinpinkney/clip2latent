@@ -76,9 +76,9 @@ class Clipper(torch.nn.Module):
             return p.device
 
 def validation(current_it, device, diffusion_prior, G, clip_model, val_data, samples_per_text):
-
-
     single_im = {"clip_features": val_data["val_im"]["clip_features"][0].unsqueeze(0)}
+    captions = val_data["val_caption"]
+
     for input_data, key, cond_scale, repeats in zip(
         [val_data["val_im"], single_im, val_data["val_text"], val_data["val_text"]],
         ["image-similarity", "image-vars", "text2im", "text2im-super2"],
@@ -88,8 +88,21 @@ def validation(current_it, device, diffusion_prior, G, clip_model, val_data, sam
         tiled_data = input_data["clip_features"].repeat_interleave(repeats, dim=0)
         cos_sim, ims = compute_val(diffusion_prior, tiled_data, G, clip_model, device, cond_scale=cond_scale)
         wandb.log({f'val/{key}':cos_sim.mean()}, step=current_it)
-        for idx, im in enumerate(ims.chunk(int(np.ceil(ims.shape[0]/16)))):
-            wandb.log({f'val/image/{key}-{idx}': wandb.Image(make_grid(im))}, step=current_it)
+
+
+        if key.startswith("text"):
+            num_chunks = int(np.ceil(ims.shape[0]//repeats))
+            for idx, (sim, im_chunk) in enumerate(zip(
+                cos_sim.chunk(num_chunks), 
+                ims.chunk(num_chunks)
+                )):
+                
+                caption = captions[idx]
+                im = wandb.Image(make_grid(im_chunk), caption=f'{sim.mean():.2f} - {caption}')
+                wandb.log({f'val/image/{key}/{idx}': im}, step=current_it)
+        else:
+            for idx, im in enumerate(ims.chunk(int(np.ceil(ims.shape[0]/16)))):
+                wandb.log({f'val/image/{key}/{idx}': wandb.Image(make_grid(im))}, step=current_it)
 
     logger.info("Validation done.")
 
@@ -177,9 +190,11 @@ def main(cfg):
         G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
     clip_model = Clipper(cfg.data.clip_variant).to(device)
 
+    text_embed, text_samples = make_text_val_data(G, clip_model, hydra.utils.to_absolute_path(cfg.data.val_text_samples))
     val_data = {
         "val_im": make_image_val_data(G, clip_model, cfg.data.val_im_samples, device),
-        "val_text": make_text_val_data(G, clip_model, hydra.utils.to_absolute_path(cfg.data.val_text_samples)),
+        "val_text": text_embed,
+        "val_caption": text_samples,
     }
 
     trainer = DiffusionPriorTrainer(

@@ -61,7 +61,7 @@ def make_text_val_data(G, clip_model, text_samples_file):
         text_samples = f.read().splitlines()
     text_features = clip_model.embed_text(text_samples)
     val_data = {"clip_features": text_features,}
-    return val_data
+    return val_data, text_samples
 
 @torch.no_grad()
 def compute_val(diffusion, input_embed, G, clip_model, device, cond_scale=1.0, bs=8):
