@@ -31,8 +31,20 @@ generators = {
     "sg3-lhq-256": partial(load_sg, 'data/models/lhq-256-stylegan3-t-25Mimg.pkl'),
 }
 
+def mix_styles(w_batch, space):
+    space_spec = {
+        "w3": (4, 4, 10),
+    }
+    latent_mix = space_spec[space]
+
+    bs = w_batch.shape[0]
+    spec = torch.tensor(latent_mix).to(w_batch.device)
+
+    index = torch.randint(0,bs, (len(spec),bs)).to(w_batch.device)
+    return w_batch[index, 0, :].permute(1,0,2).repeat_interleave(spec, dim=1), spec
+
 @torch.no_grad()
-def run_folder_list(device_index, out_dir, generator_name, feature_extractor_name, out_image_size, batch_size, n_save_workers, samples_per_folder, folder_indexes):
+def run_folder_list(device_index, out_dir, generator_name, feature_extractor_name, out_image_size, batch_size, n_save_workers, samples_per_folder, folder_indexes, space="w"):
     device = f"cuda:{device_index}"
     typer.echo(device_index)
     typer.echo("Loading generator")
@@ -42,6 +54,7 @@ def run_folder_list(device_index, out_dir, generator_name, feature_extractor_nam
     normalize = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
     
     typer.echo("Generating samples")
+    typer.echo(f"using space {space}")
     with Parallel(n_jobs=n_save_workers, prefer="threads") as parallel:
         for i_folder in folder_indexes:
             folder_name = out_dir/f"{i_folder:05d}"
@@ -52,7 +65,14 @@ def run_folder_list(device_index, out_dir, generator_name, feature_extractor_nam
             ds = torch.utils.data.TensorDataset(w)
             loader = torch.utils.data.DataLoader(ds, batch_size=batch_size, shuffle=False, drop_last=False)
             for batch_idx, batch in enumerate(tqdm(loader, position=device_index)):
-                out = G.synthesis(batch[0].to(device))
+                if space == "w":
+                    this_w = batch[0].to(device)
+                    latents = this_w[:,0,:].cpu().numpy()
+                else:
+                    this_w, select_idxs = mix_styles(batch[0].to(device), space)
+                    latents = this_w[:,select_idxs,:].cpu().numpy()
+
+                out = G.synthesis(this_w)
 
                 out = torch.nn.functional.interpolate(out, (out_image_size,out_image_size), mode="area")
                 clip_in = 0.5*torch.nn.functional.interpolate(out, (224,224), mode="area") + 0.5
@@ -62,7 +82,6 @@ def run_folder_list(device_index, out_dir, generator_name, feature_extractor_nam
                 out = out.permute(0,2,3,1).clamp(-1,1)
                 out = (255*(out*0.5 + 0.5).cpu().numpy()).astype(np.uint8)
                 image_features = image_features.cpu().numpy()
-                latents = batch[0][:,0,:].cpu().numpy()
                 parallel(
                     delayed(process_and_save)(batch_size, folder_name, batch_idx, idx, latent, im, image_feature) 
                     for idx, (latent, im, image_feature) in enumerate(zip(latents, out, image_features))
@@ -93,6 +112,7 @@ def main(
     feat_im_preprocess:str="resize", # TODO others e.g. nxrandcrop and average
     batch_size:int=32, # 64 struggles?
     n_save_workers:int=16,
+    space:str="w",
     ):
     typer.echo("starting")
 
@@ -108,7 +128,7 @@ def main(
     for dev_idx, folder_list in enumerate(sub_indexes):
         p = Process(
             target=run_folder_list, 
-            args=(dev_idx, out_dir, generator_name, feature_extractor_name, out_image_size, batch_size, n_save_workers, samples_per_folder, folder_list),
+            args=(dev_idx, out_dir, generator_name, feature_extractor_name, out_image_size, batch_size, n_save_workers, samples_per_folder, folder_list, space),
             )
         p.start()
         ps.append(p)

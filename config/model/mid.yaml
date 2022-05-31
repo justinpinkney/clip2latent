@@ -5,9 +5,10 @@ network:
   dim_head: 64
   heads: 12
 diffusion:
-  image_embed_dim: 512
-  timesteps: 1000
+  image_embed_dim: ${model.network.dim}
+  timesteps: ${model.network.num_timesteps}
   cond_drop_prob: 0.2
   image_embed_scale: 1.0
+  text_embed_scale: 1.0
   beta_schedule: "cosine"
   predict_x_start: True

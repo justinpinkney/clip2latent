@@ -1,15 +1,17 @@
 defaults:
-  - model: small
+  - model: mid
   - data: sg2-ffhq
-  - val: sg2-ffhq
 
+wandb_project: clip2latent
+wandb_entity: null
+name: null
 device: "cuda:0"
 train:
-  loop:
-    print_it: 100
-    max_it: 1000000
-    val_it: 5000
-  opt:
-    lr: 3.0e-4
-    weight_decay: 1.0e-2
-    betas: [0.9, 0.999]
+  znorm_embed: false
+  znorm_latent: true
+  max_it: 1_000_000
+  val_it: 10_000
+  lr: 1.0e-4
+  weight_decay: 1.0e-2
+  ema_update_every: 1
+  ema_beta: 0.99999
