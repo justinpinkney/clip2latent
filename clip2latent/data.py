@@ -14,7 +14,8 @@ def add_noise(x, scale=0.75):
     noise = torch.randn_like(x)
     noise /= noise.norm(dim=-1, keepdim=True)
     x += scale*noise
-    x /= x.norm(dim=-1, keepdim=True)*orig_norm
+    x /= x.norm(dim=-1, keepdim=True)
+    x *= orig_norm
     return x
 
 def load_data(cfg, n_stats=10_000, shuffle=5000, n_workers=16):
