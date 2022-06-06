@@ -1,7 +1,7 @@
-bs: 32
+bs: 512
 format: webdataset
 path: data/webdataset/sg3-lhq-256-clip/{00000..99}.tar
-noise_scale: 0.75
+embed_noise_scale: 0.75
 sg_pkl: '/home/jpinkney/code/clip2latent/data/models/lhq-256-stylegan3-t-25Mimg.pkl'
 clip_variant: "ViT-B/32"
 n_latents: 1

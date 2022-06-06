@@ -6,6 +6,7 @@ wandb_project: clip2latent
 wandb_entity: null
 name: null
 device: "cuda:0"
+resume: null
 train:
   znorm_embed: false
   znorm_latent: true

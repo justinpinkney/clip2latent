@@ -204,6 +204,11 @@ def main(cfg):
         ema_beta=cfg.train.ema_beta,
         ema_update_every=cfg.train.ema_update_every,
     ).to(device)
+
+    if 'resume' in cfg and cfg.resume is not None:
+        # Does not load prev it count
+        logger.info(f"Resuming from {cfg.resume}")
+        trainer.load_state_dict(torch.load(cfg.resume)["state_dict"])
     
     checkpoint_dir = f"checkpoints/{datetime.now():%Y%m%d-%H%M%S}"
     checkpointer = Checkpointer(checkpoint_dir, cfg.train.val_it)
