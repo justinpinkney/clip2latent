@@ -160,35 +160,10 @@ def main(cfg):
         entity=cfg.wandb_entity,
         name=cfg.name,
     )
-    # Load model
+
     device = cfg.device
-
     stats, loader = load_data(cfg.data)
-
-    if cfg.data.n_latents > 1:
-        prior_network = WPlusPriorNetwork(n_latents=cfg.data.n_latents, **cfg.model.network).to(device)
-    else:
-        prior_network = DiffusionPriorNetwork(**cfg.model.network).to(device)
-
-    embed_stats = latent_stats = (None, None)
-    if cfg.train.znorm_embed:
-        embed_stats = stats["clip_features"]
-    if cfg.train.znorm_latent:
-        latent_stats = stats["w"]
-    
-    diffusion_prior = LatentPrior(
-        prior_network,
-        num_latents=cfg.data.n_latents,
-        latent_repeats=cfg.data.latent_repeats,
-        latent_stats=latent_stats,
-        embed_stats=embed_stats,
-        **cfg.model.diffusion).to(device)
-    diffusion_prior.cfg = cfg
-
-    # Load eval models
-    with dnnlib.util.open_url(cfg.data.sg_pkl) as f:
-        G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
-    clip_model = Clipper(cfg.data.clip_variant).to(device)
+    G, clip_model, trainer = load_models(cfg, device, stats)
 
     text_embed, text_samples = make_text_val_data(G, clip_model, hydra.utils.to_absolute_path(cfg.data.val_text_samples))
     val_data = {
@@ -197,18 +172,10 @@ def main(cfg):
         "val_caption": text_samples,
     }
 
-    trainer = DiffusionPriorTrainer(
-        diffusion_prior=diffusion_prior,
-        lr=cfg.train.lr,
-        wd=cfg.train.weight_decay,
-        ema_beta=cfg.train.ema_beta,
-        ema_update_every=cfg.train.ema_update_every,
-    ).to(device)
-
     if 'resume' in cfg and cfg.resume is not None:
         # Does not load prev it count
         logger.info(f"Resuming from {cfg.resume}")
-        trainer.load_state_dict(torch.load(cfg.resume)["state_dict"])
+        trainer.load_state_dict(torch.load(cfg.resume)["state_dict"]) # todo load on cpu
     
     checkpoint_dir = f"checkpoints/{datetime.now():%Y%m%d-%H%M%S}"
     checkpointer = Checkpointer(checkpoint_dir, cfg.train.val_it)
@@ -225,6 +192,50 @@ def main(cfg):
         validate=validate,
         save_checkpoint=checkpointer.save_checkpoint,
         )
+
+def load_models(cfg, device, stats=None):
+    if cfg.data.n_latents > 1:
+        prior_network = WPlusPriorNetwork(n_latents=cfg.data.n_latents, **cfg.model.network).to(device)
+    else:
+        prior_network = DiffusionPriorNetwork(**cfg.model.network).to(device)
+
+    embed_stats = latent_stats = (None, None)
+    if stats is None:
+        # Make dummy stats assuming they will be loaded form the state dict
+        clip_dummy_stat = torch.zeros(cfg.model.network.dim,1)
+        w_dummy_stat = torch.zeros(cfg.model.network.dim)
+        if cfg.data.n_latents > 1:
+            w_dummy_stat = w_dummy_stat.unsqueeze(0).tile(1, cfg.data.n_latents)
+        stats = {"clip_features": (clip_dummy_stat, clip_dummy_stat), "w": (w_dummy_stat, w_dummy_stat)}
+
+    if cfg.train.znorm_embed:
+        embed_stats = stats["clip_features"]
+    if cfg.train.znorm_latent:
+        latent_stats = stats["w"]
+
+    diffusion_prior = LatentPrior(
+        prior_network,
+        num_latents=cfg.data.n_latents,
+        latent_repeats=cfg.data.latent_repeats,
+        latent_stats=latent_stats,
+        embed_stats=embed_stats,
+        **cfg.model.diffusion).to(device)
+    diffusion_prior.cfg = cfg
+
+    # Load eval models
+    with dnnlib.util.open_url(cfg.data.sg_pkl) as f:
+        G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
+    clip_model = Clipper(cfg.data.clip_variant).to(device)
+
+    trainer = DiffusionPriorTrainer(
+        diffusion_prior=diffusion_prior,
+        lr=cfg.train.lr,
+        wd=cfg.train.weight_decay,
+        ema_beta=cfg.train.ema_beta,
+        ema_update_every=cfg.train.ema_update_every,
+    ).to(device)
+    
+    return G,clip_model,trainer
 
 if __name__ == "__main__":
     main()

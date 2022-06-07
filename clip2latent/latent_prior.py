@@ -61,8 +61,7 @@ class LatentPrior(DiffusionPrior):
         self.num_latents = num_latents
         assert self.num_latents == len(latent_repeats), \
             f"Number of latents ({num_latents}) and length of repeats ({len(latent_repeats)}) don't match"
-        latent_repeats = torch.tensor(latent_repeats).to(torch.long)
-        self.register_buffer("latent_repeats", latent_repeats)
+        self.latent_repeats = latent_repeats
 
     def set_timestep_skip(self, skip):
         """Support simple timestep respacing allowing a skip factor"""
@@ -150,7 +149,8 @@ class LatentPrior(DiffusionPrior):
         # Reformat for StyleGAN
         if self.num_latents == 1:
             latents = latents.unsqueeze(1)
-        latents = latents.repeat_interleave(self.latent_repeats, dim=1)
+        latent_repeats = torch.tensor(self.latent_repeats).to(torch.long).to(latents.device)
+        latents = latents.repeat_interleave(latent_repeats, dim=1)
         
         return latents
 

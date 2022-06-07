@@ -14,5 +14,6 @@ train:
   val_it: 10_000
   lr: 1.0e-4
   weight_decay: 1.0e-2
-  ema_update_every: 1
-  ema_beta: 0.99999
+  ema_update_every: 10
+  ema_beta: 0.9999
+  ema_power: 0.75
