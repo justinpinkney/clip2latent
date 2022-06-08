@@ -106,7 +106,7 @@ class LatentPrior(DiffusionPrior):
         return self.p_losses(image_embed, times, text_cond = text_cond, *args, **kwargs)
 
     @torch.no_grad()
-    def p_sample_loop(self, shape, text_cond, cond_scale = 1.):
+    def p_sample_loop(self, shape, text_cond, cond_scale = 1., show_progress=True):
         skip = self.skip_timesteps
         device = self.betas.device
 
@@ -116,13 +116,17 @@ class LatentPrior(DiffusionPrior):
         if self.init_image_embed_l2norm:
             image_embed = l2norm(image_embed) * self.image_embed_scale
 
-        for i in tqdm(reversed(range(0, self.num_timesteps, skip)), desc='sampling loop time step', total=self.num_timesteps//skip):
+        loop = reversed(range(0, self.num_timesteps, skip))
+        if show_progress:
+            loop = tqdm(loop, desc='sampling loop time step', total=self.num_timesteps//skip)
+        
+        for i in loop:
             times = torch.full((b,), i, device = device, dtype = torch.long)
             image_embed = self.p_sample(image_embed, times, text_cond = text_cond, cond_scale = cond_scale)
         return image_embed
 
     @torch.no_grad()
-    def sample(self, embed, cond_scale=1.0):
+    def sample(self, embed, cond_scale=1.0, **kwargs):
         """Generates latent vectors conditioned on embed.
         Latent vectors are the correct shape (and un-normalised) to pass into the StyleGAN model that generated them
         E.g. for FFHQ stylegan2 this would be (batch_size,18,512)
@@ -139,7 +143,7 @@ class LatentPrior(DiffusionPrior):
         embed *= self.text_embed_scale
 
         cond = {"text_embed": embed}
-        latents = self.p_sample_loop(shape, cond, cond_scale=cond_scale)
+        latents = self.p_sample_loop(shape, cond, cond_scale=cond_scale, **kwargs)
 
         # Denormalise
         latents = latents/self.image_embed_scale
