@@ -7,3 +7,4 @@ hydra-core==1.1.2
 typer==0.4.1
 joblib==1.1.0
 webdataset==0.2.5
+gradio==3.0.2

@@ -126,10 +126,12 @@ class LatentPrior(DiffusionPrior):
         return image_embed
 
     @torch.no_grad()
-    def sample(self, embed, cond_scale=1.0, **kwargs):
+    def sample(self, embed, cond_scale=1.0, truncation=1.0, **kwargs):
         """Generates latent vectors conditioned on embed.
         Latent vectors are the correct shape (and un-normalised) to pass into the StyleGAN model that generated them
         E.g. for FFHQ stylegan2 this would be (batch_size,18,512)
+
+        Truncation only really makes sense if the data is normalised
         """
 
         batch = embed.shape[0]
@@ -149,6 +151,10 @@ class LatentPrior(DiffusionPrior):
         latents = latents/self.image_embed_scale
         if exists(self.latent_mean):
             latents = denormalise_data(latents, self.latent_mean, self.latent_std)
+
+        if truncation < 1.0:
+            assert exists(self.latent_mean), "Can't do truncation without latent mean"
+            latents = self.latent_mean + truncation*(latents - self.latent_mean)
 
         # Reformat for StyleGAN
         if self.num_latents == 1:
