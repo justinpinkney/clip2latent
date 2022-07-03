@@ -4,19 +4,16 @@ import multiprocessing as mp
 import math
 from functools import partial
 from pathlib import Path
-from typing import Any
 
-import clip
 import numpy as np
 import torch
 import typer
 from joblib import Parallel, delayed
 from PIL import Image
 from tqdm import tqdm
-from torchvision import transforms
 import torch.nn.functional as F
 
-from clip2latent.models import load_sg
+from clip2latent.models import Clipper, load_sg
 
 
 generators = {
@@ -60,8 +57,7 @@ def run_folder_list(
     G = generators[generator_name]().to(device).eval()
 
     typer.echo("Loading feature extractor")
-    feature_extractor, _ = clip.load(feature_extractor_name, device=device)
-    normalize = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
+    feature_extractor = Clipper(feature_extractor_name).to(device)
     
     typer.echo("Generating samples")
     typer.echo(f"using space {space}")
@@ -86,13 +82,14 @@ def run_folder_list(
                 out = G.synthesis(this_w)
 
                 out = F.interpolate(out, (out_image_size,out_image_size), mode="area")
-                clip_in = 0.5*F.interpolate(out, (224,224), mode="area") + 0.5
-                image_features = feature_extractor.encode_image(normalize(clip_in))
-
-
-                out = out.permute(0,2,3,1).clamp(-1,1)
-                out = (255*(out*0.5 + 0.5).cpu().numpy()).astype(np.uint8)
+                image_features = feature_extractor.embed_image(out)
                 image_features = image_features.cpu().numpy()
+
+                if save_im:
+                    out = out.permute(0,2,3,1).clamp(-1,1)
+                    out = (255*(out*0.5 + 0.5).cpu().numpy()).astype(np.uint8)
+                else:
+                    out = [None]*len(latents)
                 parallel(
                     delayed(process_and_save)(batch_size, folder_name, batch_idx, idx, latent, im, image_feature, save_im) 
                     for idx, (latent, im, image_feature) in enumerate(zip(latents, out, image_features))
@@ -102,12 +99,12 @@ def run_folder_list(
 
 
 def process_and_save(batch_size, folder_name, batch_idx, idx, latent, im, image_feature, save_im):
-    im = Image.fromarray(im)
     count = batch_idx*batch_size + idx
     basename = folder_name/f"{folder_name.stem}{count:04}"
     np.save(basename.with_suffix(".latent.npy"), latent)
     np.save(basename.with_suffix(".img_feat.npy"), image_feature)
     if save_im:
+        im = Image.fromarray(im)
         im.save(basename.with_suffix(".gen.jpg"), quality=95)
 
 
