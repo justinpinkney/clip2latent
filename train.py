@@ -4,7 +4,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-import clip
 import hydra
 import torch
 from dalle2_pytorch import DiffusionPriorNetwork
@@ -20,8 +19,7 @@ sys.path.append("stylegan3")
 import dnnlib
 import legacy
 import torch
-from torchvision import transforms
-import torch.nn.functional as F
+
 
 from clip2latent import train_utils
 from clip2latent.latent_prior import LatentPrior, WPlusPriorNetwork
@@ -53,27 +51,6 @@ class Checkpointer():
         torch.save(checkpoint, filename)
 
 
-class Clipper(torch.nn.Module):
-    def __init__(self, clip_variant):
-        super().__init__()
-        clip_model, _ = clip.load(clip_variant, device="cpu")
-        self.clip = clip_model
-        self.normalize = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
-        self.clip_size = (224,224)
-
-    def embed_image(self, image):
-        """Expects images in -1 to 1 range"""
-        clip_in = F.interpolate(image, self.clip_size, mode="area")
-        clip_in = self.normalize(0.5*clip_in + 0.5).clamp(0,1)
-        return self.clip.encode_image(self.normalize(clip_in))
-
-    def embed_text(self, text_samples):
-        text = clip.tokenize(text_samples).to(self._get_device())
-        return self.clip.encode_text(text)
-
-    def _get_device(self):
-        for p in self.clip.parameters():
-            return p.device
 
 def validation(current_it, device, diffusion_prior, G, clip_model, val_data, samples_per_text):
     single_im = {"clip_features": val_data["val_im"]["clip_features"][0].unsqueeze(0)}
