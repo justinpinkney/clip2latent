@@ -1,31 +1,20 @@
-from functools import partial
 import logging
 import sys
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 import hydra
-import torch
-from dalle2_pytorch import DiffusionPriorNetwork
-from dalle2_pytorch.dalle2_pytorch import exists, default
-from dalle2_pytorch.train import DiffusionPriorTrainer
-from omegaconf import DictConfig, OmegaConf
-from tqdm.auto import tqdm
 import numpy as np
+import torch
+from omegaconf import OmegaConf
+from tqdm.auto import tqdm
 
 import wandb
-
-sys.path.append("stylegan3")
-import dnnlib
-import legacy
-import torch
-
-
-from clip2latent import train_utils
-from clip2latent.latent_prior import LatentPrior, WPlusPriorNetwork
+from clip2latent.data import load_data
+from clip2latent.models import load_models
 from clip2latent.train_utils import (compute_val, make_grid,
                                      make_image_val_data, make_text_val_data)
-from clip2latent.data import load_data
 
 logger = logging.getLogger(__name__)
 
@@ -150,9 +139,9 @@ def main(cfg):
     }
 
     if 'resume' in cfg and cfg.resume is not None:
-        # Does not load prev it count
+        # Does not load previous iteration count
         logger.info(f"Resuming from {cfg.resume}")
-        trainer.load_state_dict(torch.load(cfg.resume)["state_dict"]) # todo load on cpu
+        trainer.load_state_dict(torch.load(cfg.resume, map_location="cpu")["state_dict"])
     
     checkpoint_dir = f"checkpoints/{datetime.now():%Y%m%d-%H%M%S}"
     checkpointer = Checkpointer(checkpoint_dir, cfg.train.val_it)
@@ -169,50 +158,6 @@ def main(cfg):
         validate=validate,
         save_checkpoint=checkpointer.save_checkpoint,
         )
-
-def load_models(cfg, device, stats=None):
-    if cfg.data.n_latents > 1:
-        prior_network = WPlusPriorNetwork(n_latents=cfg.data.n_latents, **cfg.model.network).to(device)
-    else:
-        prior_network = DiffusionPriorNetwork(**cfg.model.network).to(device)
-
-    embed_stats = latent_stats = (None, None)
-    if stats is None:
-        # Make dummy stats assuming they will be loaded form the state dict
-        clip_dummy_stat = torch.zeros(cfg.model.network.dim,1)
-        w_dummy_stat = torch.zeros(cfg.model.network.dim)
-        if cfg.data.n_latents > 1:
-            w_dummy_stat = w_dummy_stat.unsqueeze(0).tile(1, cfg.data.n_latents)
-        stats = {"clip_features": (clip_dummy_stat, clip_dummy_stat), "w": (w_dummy_stat, w_dummy_stat)}
-
-    if cfg.train.znorm_embed:
-        embed_stats = stats["clip_features"]
-    if cfg.train.znorm_latent:
-        latent_stats = stats["w"]
-
-    diffusion_prior = LatentPrior(
-        prior_network,
-        num_latents=cfg.data.n_latents,
-        latent_repeats=cfg.data.latent_repeats,
-        latent_stats=latent_stats,
-        embed_stats=embed_stats,
-        **cfg.model.diffusion).to(device)
-    diffusion_prior.cfg = cfg
-
-    # Load eval models
-    with dnnlib.util.open_url(cfg.data.sg_pkl) as f:
-        G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
-    clip_model = Clipper(cfg.data.clip_variant).to(device)
-
-    trainer = DiffusionPriorTrainer(
-        diffusion_prior=diffusion_prior,
-        lr=cfg.train.lr,
-        wd=cfg.train.weight_decay,
-        ema_beta=cfg.train.ema_beta,
-        ema_update_every=cfg.train.ema_update_every,
-    ).to(device)
-    
-    return G,clip_model,trainer
 
 if __name__ == "__main__":
     main()
