@@ -2,6 +2,7 @@ defaults:
   - model: mid
   - data: sg2-ffhq
 
+logging: wandb
 wandb_project: clip2latent
 wandb_entity: null
 name: null

@@ -17,6 +17,8 @@ from clip2latent.train_utils import (compute_val, make_grid,
                                      make_image_val_data, make_text_val_data)
 
 logger = logging.getLogger(__name__)
+noop = lambda *args: None
+logfun = noop
 
 class Checkpointer():
     def __init__(self, directory, checkpoint_its):
@@ -53,7 +55,7 @@ def validation(current_it, device, diffusion_prior, G, clip_model, val_data, sam
     ):
         tiled_data = input_data["clip_features"].repeat_interleave(repeats, dim=0)
         cos_sim, ims = compute_val(diffusion_prior, tiled_data, G, clip_model, device, cond_scale=cond_scale)
-        wandb.log({f'val/{key}':cos_sim.mean()}, step=current_it)
+        logfun({f'val/{key}':cos_sim.mean()}, step=current_it)
 
 
         if key.startswith("text"):
@@ -65,10 +67,10 @@ def validation(current_it, device, diffusion_prior, G, clip_model, val_data, sam
                 
                 caption = captions[idx]
                 im = wandb.Image(make_grid(im_chunk), caption=f'{sim.mean():.2f} - {caption}')
-                wandb.log({f'val/image/{key}/{idx}': im}, step=current_it)
+                logfun({f'val/image/{key}/{idx}': im}, step=current_it)
         else:
             for idx, im in enumerate(ims.chunk(int(np.ceil(ims.shape[0]/16)))):
-                wandb.log({f'val/image/{key}/{idx}': wandb.Image(make_grid(im))}, step=current_it)
+                logfun({f'val/image/{key}/{idx}': wandb.Image(make_grid(im))}, step=current_it)
 
     logger.info("Validation done.")
 
@@ -90,7 +92,7 @@ def train(trainer, loader, device, val_it, validate, save_checkpoint, max_it, pr
 
     while current_it < max_it:
     
-        wandb.log({'epoch': current_epoch}, step=current_it)
+        logfun({'epoch': current_epoch}, step=current_it)
         pbar = tqdm(loader)
         for batch in pbar:
             if current_it % val_it == 0:
@@ -106,7 +108,7 @@ def train(trainer, loader, device, val_it, validate, save_checkpoint, max_it, pr
             loss = trainer(**input_args)
 
             if (current_it % print_it == 0):
-                wandb.log({'loss': loss}, step=current_it)
+                logfun({'loss': loss}, step=current_it)
             
             trainer.update()
             current_it += 1
@@ -120,12 +122,19 @@ def train(trainer, loader, device, val_it, validate, save_checkpoint, max_it, pr
 @hydra.main(config_path="config", config_name="config")
 def main(cfg):
 
-    wandb.init(
-        project=cfg.wandb_project,
-        config=OmegaConf.to_container(cfg),
-        entity=cfg.wandb_entity,
-        name=cfg.name,
-    )
+    if cfg.logging == "wandb":
+        wandb.init(
+            project=cfg.wandb_project,
+            config=OmegaConf.to_container(cfg),
+            entity=cfg.wandb_entity,
+            name=cfg.name,
+        )
+        global logfun
+        logfun = wandb.log
+    elif cfg.logging is None:
+        logger.info("Not logging")
+    else:
+        raise NotImplementedError(f"Logging type {cfg.logging} not implemented")
 
     device = cfg.device
     stats, loader = load_data(cfg.data)
