@@ -113,6 +113,19 @@ def process_and_save(batch_size, folder_name, batch_idx, idx, latent, im, image_
         im = Image.fromarray(im)
         im.save(basename.with_suffix(".gen.jpg"), quality=95)
 
+def make_webdataset(in_dir, out_dir):
+    import tarfile
+    in_folders = [x for x in Path(in_dir).glob("*") if x.is_dir]
+    out_dir = Path(out_dir)
+    out_dir.mkdir()
+    for folder in in_folders:
+        filename = out_dir/f"{folder.stem}.tar"
+        files_to_add = sorted(list(folder.rglob("*")))
+
+        with tarfile.open(filename, "w") as tar:
+            for f in files_to_add:
+                tar.add(f)
+
 
 def main(
     out_dir:Path,

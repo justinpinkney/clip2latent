@@ -8,7 +8,6 @@ def test_generate(tmp_path, save_im):
     n_samples = 100
     per_folder = 50
     out_dir = tmp_path/"out"
-    save_im = True
     main(out_dir=out_dir, n_samples=n_samples, samples_per_folder=per_folder, save_im=save_im)
 
     created_folders = list(out_dir.glob("*"))

@@ -8,5 +8,5 @@ n_latents: 1
 latent_dim: 512
 latent_repeats: [16]
 val_im_samples: 64
-val_text_samples: data/text/landscape-val.txt
+val_text_samples: text/landscape-val.txt
 val_samples_per_text: 4

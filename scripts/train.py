@@ -1,5 +1,4 @@
 import logging
-import sys
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -17,10 +16,11 @@ from clip2latent.train_utils import (compute_val, make_grid,
                                      make_image_val_data, make_text_val_data)
 
 logger = logging.getLogger(__name__)
-noop = lambda *args: None
+noop = lambda *args, **kwargs: None
 logfun = noop
 
 class Checkpointer():
+    """A small class to take care of saving checkpoints"""
     def __init__(self, directory, checkpoint_its):
         directory = Path(directory)
         self.directory = directory
