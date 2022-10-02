@@ -44,7 +44,7 @@ class Clipper(torch.nn.Module):
 
 class Clip2StyleGAN(torch.nn.Module):
     """A wrapper around the compontent models to create an end-to-end text2image model"""
-    def __init__(self, cfg, device, checkpoint=None, skips=1) -> None:
+    def __init__(self, cfg, device, checkpoint=None) -> None:
         super().__init__()
 
         if not isinstance(cfg, DictConfig):
@@ -54,17 +54,19 @@ class Clip2StyleGAN(torch.nn.Module):
         if checkpoint is not None:
             trainer.load_state_dict(torch.load(checkpoint, map_location="cpu")["state_dict"], strict=False)
         diffusion_prior = trainer.ema_diffusion_prior.ema_model
-        diffusion_prior.set_timestep_skip(skips)
         self.G = G
         self.clip_model = clip_model
         self.diffusion_prior = diffusion_prior
 
-    def forward(self, text_samples, n_samples_per_txt=1, cond_scale=1.0, truncation=1.0, clip_sort=False):
+    def forward(self, text_samples, n_samples_per_txt=1, cond_scale=1.0, truncation=1.0, skips=1, clip_sort=False, edit=None, show_progress=True):
+        self.diffusion_prior.set_timestep_skip(skips)
         text_features = self.clip_model.embed_text(text_samples)
         if n_samples_per_txt > 1:
             text_features = text_features.repeat_interleave(n_samples_per_txt, dim=0)
-        pred_w = self.diffusion_prior.sample(text_features, cond_scale=cond_scale, show_progress=True, truncation=truncation)
+        pred_w = self.diffusion_prior.sample(text_features, cond_scale=cond_scale, show_progress=show_progress, truncation=truncation)
         
+        if edit is not None:
+            pred_w = pred_w + edit.to(pred_w.device)
         images = self.G.synthesis(pred_w)
 
         pred_w_clip_features = self.clip_model.embed_image(images)        
