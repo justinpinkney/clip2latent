@@ -27,6 +27,7 @@ def load_data(cfg, n_stats=10_000, shuffle=5000, n_workers=16):
     try:
         data_path = hydra.utils.to_absolute_path(cfg.path)
     except TypeError:
+        # We might specify multiple paths
         data_path = [hydra.utils.to_absolute_path(x) for x in cfg.path]
     stats_ds = wds.WebDataset(data_path).decode().to_tuple('img_feat.npy', 'latent.npy').shuffle(shuffle).batched(n_stats)
     stats_data = next(stats_ds.__iter__())

@@ -1,37 +1,26 @@
-from functools import partial
 import logging
-import sys
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
-import clip
 import hydra
-import torch
-from dalle2_pytorch import DiffusionPriorNetwork
-from dalle2_pytorch.dalle2_pytorch import exists, default
-from dalle2_pytorch.train import DiffusionPriorTrainer
-from omegaconf import DictConfig, OmegaConf
-from tqdm.auto import tqdm
 import numpy as np
+import torch
+from omegaconf import OmegaConf
+from tqdm.auto import tqdm
 
 import wandb
-
-sys.path.append("stylegan3")
-import dnnlib
-import legacy
-import torch
-from torchvision import transforms
-import torch.nn.functional as F
-
-from clip2latent import train_utils
-from clip2latent.latent_prior import LatentPrior, WPlusPriorNetwork
+from clip2latent.data import load_data
+from clip2latent.models import load_models
 from clip2latent.train_utils import (compute_val, make_grid,
                                      make_image_val_data, make_text_val_data)
-from clip2latent.data import load_data
 
 logger = logging.getLogger(__name__)
+noop = lambda *args, **kwargs: None
+logfun = noop
 
 class Checkpointer():
+    """A small class to take care of saving checkpoints"""
     def __init__(self, directory, checkpoint_its):
         directory = Path(directory)
         self.directory = directory
@@ -53,27 +42,6 @@ class Checkpointer():
         torch.save(checkpoint, filename)
 
 
-class Clipper(torch.nn.Module):
-    def __init__(self, clip_variant):
-        super().__init__()
-        clip_model, _ = clip.load(clip_variant, device="cpu")
-        self.clip = clip_model
-        self.normalize = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
-        self.clip_size = (224,224)
-
-    def embed_image(self, image):
-        """Expects images in -1 to 1 range"""
-        clip_in = F.interpolate(image, self.clip_size, mode="area")
-        clip_in = self.normalize(0.5*clip_in + 0.5).clamp(0,1)
-        return self.clip.encode_image(self.normalize(clip_in))
-
-    def embed_text(self, text_samples):
-        text = clip.tokenize(text_samples).to(self._get_device())
-        return self.clip.encode_text(text)
-
-    def _get_device(self):
-        for p in self.clip.parameters():
-            return p.device
 
 def validation(current_it, device, diffusion_prior, G, clip_model, val_data, samples_per_text):
     single_im = {"clip_features": val_data["val_im"]["clip_features"][0].unsqueeze(0)}
@@ -87,7 +55,7 @@ def validation(current_it, device, diffusion_prior, G, clip_model, val_data, sam
     ):
         tiled_data = input_data["clip_features"].repeat_interleave(repeats, dim=0)
         cos_sim, ims = compute_val(diffusion_prior, tiled_data, G, clip_model, device, cond_scale=cond_scale)
-        wandb.log({f'val/{key}':cos_sim.mean()}, step=current_it)
+        logfun({f'val/{key}':cos_sim.mean()}, step=current_it)
 
 
         if key.startswith("text"):
@@ -99,10 +67,10 @@ def validation(current_it, device, diffusion_prior, G, clip_model, val_data, sam
                 
                 caption = captions[idx]
                 im = wandb.Image(make_grid(im_chunk), caption=f'{sim.mean():.2f} - {caption}')
-                wandb.log({f'val/image/{key}/{idx}': im}, step=current_it)
+                logfun({f'val/image/{key}/{idx}': im}, step=current_it)
         else:
             for idx, im in enumerate(ims.chunk(int(np.ceil(ims.shape[0]/16)))):
-                wandb.log({f'val/image/{key}/{idx}': wandb.Image(make_grid(im))}, step=current_it)
+                logfun({f'val/image/{key}/{idx}': wandb.Image(make_grid(im))}, step=current_it)
 
     logger.info("Validation done.")
 
@@ -124,7 +92,7 @@ def train(trainer, loader, device, val_it, validate, save_checkpoint, max_it, pr
 
     while current_it < max_it:
     
-        wandb.log({'epoch': current_epoch}, step=current_it)
+        logfun({'epoch': current_epoch}, step=current_it)
         pbar = tqdm(loader)
         for batch in pbar:
             if current_it % val_it == 0:
@@ -140,7 +108,7 @@ def train(trainer, loader, device, val_it, validate, save_checkpoint, max_it, pr
             loss = trainer(**input_args)
 
             if (current_it % print_it == 0):
-                wandb.log({'loss': loss}, step=current_it)
+                logfun({'loss': loss}, step=current_it)
             
             trainer.update()
             current_it += 1
@@ -154,12 +122,19 @@ def train(trainer, loader, device, val_it, validate, save_checkpoint, max_it, pr
 @hydra.main(config_path="config", config_name="config")
 def main(cfg):
 
-    wandb.init(
-        project=cfg.wandb_project,
-        config=OmegaConf.to_container(cfg),
-        entity=cfg.wandb_entity,
-        name=cfg.name,
-    )
+    if cfg.logging == "wandb":
+        wandb.init(
+            project=cfg.wandb_project,
+            config=OmegaConf.to_container(cfg),
+            entity=cfg.wandb_entity,
+            name=cfg.name,
+        )
+        global logfun
+        logfun = wandb.log
+    elif cfg.logging is None:
+        logger.info("Not logging")
+    else:
+        raise NotImplementedError(f"Logging type {cfg.logging} not implemented")
 
     device = cfg.device
     stats, loader = load_data(cfg.data)
@@ -173,9 +148,9 @@ def main(cfg):
     }
 
     if 'resume' in cfg and cfg.resume is not None:
-        # Does not load prev it count
+        # Does not load previous iteration count
         logger.info(f"Resuming from {cfg.resume}")
-        trainer.load_state_dict(torch.load(cfg.resume)["state_dict"]) # todo load on cpu
+        trainer.load_state_dict(torch.load(cfg.resume, map_location="cpu")["state_dict"])
     
     checkpoint_dir = f"checkpoints/{datetime.now():%Y%m%d-%H%M%S}"
     checkpointer = Checkpointer(checkpoint_dir, cfg.train.val_it)
@@ -192,50 +167,6 @@ def main(cfg):
         validate=validate,
         save_checkpoint=checkpointer.save_checkpoint,
         )
-
-def load_models(cfg, device, stats=None):
-    if cfg.data.n_latents > 1:
-        prior_network = WPlusPriorNetwork(n_latents=cfg.data.n_latents, **cfg.model.network).to(device)
-    else:
-        prior_network = DiffusionPriorNetwork(**cfg.model.network).to(device)
-
-    embed_stats = latent_stats = (None, None)
-    if stats is None:
-        # Make dummy stats assuming they will be loaded form the state dict
-        clip_dummy_stat = torch.zeros(cfg.model.network.dim,1)
-        w_dummy_stat = torch.zeros(cfg.model.network.dim)
-        if cfg.data.n_latents > 1:
-            w_dummy_stat = w_dummy_stat.unsqueeze(0).tile(1, cfg.data.n_latents)
-        stats = {"clip_features": (clip_dummy_stat, clip_dummy_stat), "w": (w_dummy_stat, w_dummy_stat)}
-
-    if cfg.train.znorm_embed:
-        embed_stats = stats["clip_features"]
-    if cfg.train.znorm_latent:
-        latent_stats = stats["w"]
-
-    diffusion_prior = LatentPrior(
-        prior_network,
-        num_latents=cfg.data.n_latents,
-        latent_repeats=cfg.data.latent_repeats,
-        latent_stats=latent_stats,
-        embed_stats=embed_stats,
-        **cfg.model.diffusion).to(device)
-    diffusion_prior.cfg = cfg
-
-    # Load eval models
-    with dnnlib.util.open_url(cfg.data.sg_pkl) as f:
-        G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
-    clip_model = Clipper(cfg.data.clip_variant).to(device)
-
-    trainer = DiffusionPriorTrainer(
-        diffusion_prior=diffusion_prior,
-        lr=cfg.train.lr,
-        wd=cfg.train.weight_decay,
-        ema_beta=cfg.train.ema_beta,
-        ema_update_every=cfg.train.ema_update_every,
-    ).to(device)
-    
-    return G,clip_model,trainer
 
 if __name__ == "__main__":
     main()

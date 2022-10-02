@@ -10,5 +10,5 @@ n_latents: 18
 latent_dim: 512
 latent_repeats: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 val_im_samples: 64
-val_text_samples: data/text/face-val.txt
+val_text_samples: text/face-val.txt
 val_samples_per_text: 4
