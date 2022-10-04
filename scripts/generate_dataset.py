@@ -24,7 +24,7 @@ except:
 
 generators = {
     "sg2-ffhq-1024": partial(load_sg, 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan2/versions/1/files/stylegan2-ffhq-1024x1024.pkl'),
-    "sg3-lhq-256": partial(load_sg, 'data/models/lhq-256-stylegan3-t-25Mimg.pkl'),
+    "sg3-lhq-256": partial(load_sg, 'https://huggingface.co/justinpinkney/stylegan3-t-lhq-256/resolve/main/lhq-256-stylegan3-t-25Mimg.pkl'),
 }
 
 def mix_styles(w_batch, space):
@@ -64,7 +64,7 @@ def run_folder_list(
 
     typer.echo("Loading feature extractor")
     feature_extractor = Clipper(feature_extractor_name).to(device)
-    
+
     typer.echo("Generating samples")
     typer.echo(f"using space {space}")
 
@@ -97,9 +97,9 @@ def run_folder_list(
                 else:
                     out = [None]*len(latents)
                 parallel(
-                    delayed(process_and_save)(batch_size, folder_name, batch_idx, idx, latent, im, image_feature, save_im) 
+                    delayed(process_and_save)(batch_size, folder_name, batch_idx, idx, latent, im, image_feature, save_im)
                     for idx, (latent, im, image_feature) in enumerate(zip(latents, out, image_features))
-                    ) 
+                    )
 
     typer.echo("finished folder")
 
@@ -152,7 +152,7 @@ def main(
     processes = []
     for dev_idx, folder_list in enumerate(sub_indexes):
         p = Process(
-            target=run_folder_list, 
+            target=run_folder_list,
             args=(
                 dev_idx,
                 out_dir,
@@ -176,5 +176,5 @@ def main(
     typer.echo("finished all")
 
 if __name__ == "__main__":
-    mp.set_start_method('spawn')
+    # mp.set_start_method('spawn')
     typer.run(main)

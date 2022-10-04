@@ -3,7 +3,7 @@ import torch
 from clip2latent import models
 from PIL import Image
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda"
 model_choices = {
     "faces": {
         "checkpoint": "https://huggingface.co/lambdalabs/clip2latent/resolve/main/ffhq-sg2-510.ckpt",
