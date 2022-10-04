@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from dalle2_pytorch import DiffusionPriorNetwork
 from dalle2_pytorch.train import DiffusionPriorTrainer
 from torchvision import transforms
+from io import BytesIO
+import requests
 
 from clip2latent.latent_prior import LatentPrior, WPlusPriorNetwork
 
@@ -19,6 +21,17 @@ def load_sg(network_pkl):
         G = legacy.load_network_pkl(f)['G_ema'] # type: ignore
     return G
 
+def is_url(path):
+    if isinstance(path, str) and path.startswith("http"):
+        return True
+    else:
+        return False
+
+def load_remote_cfg(cfg):
+    r = requests.get(cfg)
+    r.raise_for_status()
+    f = BytesIO(r.content)
+    return OmegaConf.load(f)
 
 class Clipper(torch.nn.Module):
     def __init__(self, clip_variant):
@@ -48,11 +61,18 @@ class Clip2StyleGAN(torch.nn.Module):
         super().__init__()
 
         if not isinstance(cfg, DictConfig):
-            cfg = OmegaConf.load(cfg)
+            if is_url(cfg):
+                cfg = load_remote_cfg(cfg)
+            else:
+                cfg = OmegaConf.load(cfg)
 
         G, clip_model, trainer = load_models(cfg, device)
         if checkpoint is not None:
-            trainer.load_state_dict(torch.load(checkpoint, map_location="cpu")["state_dict"], strict=False)
+            if is_url(checkpoint):
+                state_dict = torch.hub.load_state_dict_from_url(checkpoint, map_location="cpu")
+            else:
+                state_dict = torch.load(checkpoint, map_location="cpu")
+            trainer.load_state_dict(state_dict["state_dict"], strict=False)
         diffusion_prior = trainer.ema_diffusion_prior.ema_model
         self.G = G
         self.clip_model = clip_model
@@ -64,24 +84,24 @@ class Clip2StyleGAN(torch.nn.Module):
         if n_samples_per_txt > 1:
             text_features = text_features.repeat_interleave(n_samples_per_txt, dim=0)
         pred_w = self.diffusion_prior.sample(text_features, cond_scale=cond_scale, show_progress=show_progress, truncation=truncation)
-        
+
         if edit is not None:
             pred_w = pred_w + edit.to(pred_w.device)
         images = self.G.synthesis(pred_w)
 
-        pred_w_clip_features = self.clip_model.embed_image(images)        
+        pred_w_clip_features = self.clip_model.embed_image(images)
         similarity = torch.cosine_similarity(pred_w_clip_features, text_features)
         if clip_sort:
             similarity, idxs = torch.sort(similarity, descending=True)
             images = images[idxs, ...]
-        
+
         return images, similarity
 
 def load_models(cfg, device, stats=None):
     """Load the diffusion trainer and eval models based on a config
-    
+
     If the model requires statistics for embed or latent normalisation
-    then these should be passed into this function, unless the state of 
+    then these should be passed into this function, unless the state of
     the model is to be loaded from a state_dict (which will contain these)
     statistics, in which case the stats will be filled with dummy values.
     """
@@ -124,5 +144,5 @@ def load_models(cfg, device, stats=None):
         ema_beta=cfg.train.ema_beta,
         ema_update_every=cfg.train.ema_update_every,
     ).to(device)
-    
+
     return G, clip_model, trainer

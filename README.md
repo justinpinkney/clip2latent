@@ -12,7 +12,16 @@
 
 ![](images/headline-large.jpeg)
 
-USAGE
+## Installation
+
+```
+git clone https://github.com/justinpinkney/clip2latent.git
+cd clip2latent
+python -m venv .venv --prompt clip2latent
+. .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
 
 CITATION
 
