@@ -153,8 +153,11 @@ with block:
                   clip2latent
                 </h1>
               </div>
+              <p style="font-size: 94%">
+                Official demo for <em>clip2latent: Text driven sampling of a pre-trained StyleGAN using denoising diffusion and CLIP</em>, accepted to BMVC 2022
+              </p>
               <p style="margin-bottom: 10px; font-size: 94%">
-                Official demo for <em>clip2latent: Text driven sampling of a pre-trained StyleGAN using denoising diffusion and CLIP</ em>, accepted to BMVC 2022
+                Get the <a href="https://github.com/justinpinkney/clip2latent">code on GitHub</a>, see the <a href="#">paper on Arxiv</a>.
               </p>
             </div>
         """
@@ -202,9 +205,25 @@ with block:
                     </p>
                 </div>
                 <div class="acknowledgments">
-                    <p>Todo</p>
+                    <img src="https://raw.githubusercontent.com/justinpinkney/clip2latent/main/images/headline-large.jpeg"></img>
+                    <br>
+                    <h2 style="font-size:1.5em">clip2latent: Text driven sampling of a pre-trained StyleGAN using denoising diffusion and CLIP</h2>
+                    <p>Justin N. M. Pinkney and Chuan Li @ <a href="https://lambdalabs.com/">Lambda Inc.</a>
+                    <br>
+                    <br>
+                    <em>Abstract:</em>
+                    We introduce a new method to efficiently create text-to-image models from a pre-trained CLIP and StyleGAN.
+                    It enables text driven sampling with an existing generative model without any external data or fine-tuning.
+                    This is achieved by training a diffusion model conditioned on CLIP embeddings to sample latent vectors of a pre-trained StyleGAN, which we call <em>clip2latent</em>.
+                    We leverage the alignment between CLIP’s image and text embeddings to avoid the need for any text labelled data for training the conditional diffusion model.
+                    We demonstrate that clip2latent allows us to generate high-resolution (1024x1024 pixels) images based on text prompts with fast sampling, high image quality, and low training compute and data requirements.
+                    We also show that the use of the well studied StyleGAN architecture, without further fine-tuning, allows us to directly apply existing methods to control and modify the generated images adding a further layer of control to our text-to-image pipeline.
+                    </p>
+                    <br>
+                    <p>Trained using <a href="https://lambdalabs.com/service/gpu-cloud">Lambda GPU Cloud</a></p>
                </div>
            """
         )
 
-block.launch()
+block.queue()
+block.launch(share=True, favicon_path="images/favicon.ico")
