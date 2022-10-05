@@ -1,9 +1,7 @@
 # clip2latent: Text driven sampling of a pre-trained StyleGAN using denoising diffusion and CLIP
 
 [![Open Arxiv](https://img.shields.io/badge/arXiv-tbc.tbc-b31b1b.svg)](TODO)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](TODO)
-[![Open in Spaces](https://img.shields.io/badge/%F0%9F%A4%97-Open%20in%20Spaces-orange)](TODO)
-[![Open in Replicate](https://img.shields.io/badge/%F0%9F%9A%80-Open%20in%20Replicate-%23fff891)](TODO)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/justinpinkney/clip2latent/blob/main/demo.ipynb)
 
 
 > ## Abstract
