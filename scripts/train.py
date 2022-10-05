@@ -61,10 +61,10 @@ def validation(current_it, device, diffusion_prior, G, clip_model, val_data, sam
         if key.startswith("text"):
             num_chunks = int(np.ceil(ims.shape[0]//repeats))
             for idx, (sim, im_chunk) in enumerate(zip(
-                cos_sim.chunk(num_chunks), 
+                cos_sim.chunk(num_chunks),
                 ims.chunk(num_chunks)
                 )):
-                
+
                 caption = captions[idx]
                 im = wandb.Image(make_grid(im_chunk), caption=f'{sim.mean():.2f} - {caption}')
                 logfun({f'val/image/{key}/{idx}': im}, step=current_it)
@@ -84,14 +84,14 @@ def train_step(diffusion_prior, device, batch):
     loss.backward()
     return loss
 
-    
+
 def train(trainer, loader, device, val_it, validate, save_checkpoint, max_it, print_it=50):
-    
+
     current_it = 0
     current_epoch = 0
 
     while current_it < max_it:
-    
+
         logfun({'epoch': current_epoch}, step=current_it)
         pbar = tqdm(loader)
         for batch in pbar:
@@ -100,7 +100,7 @@ def train(trainer, loader, device, val_it, validate, save_checkpoint, max_it, pr
 
             trainer.train()
             batch_clip, batch_latent = batch
-            
+
             input_args = {
                 "image_embed": batch_latent.to(device),
                 "text_embed": batch_clip.to(device)
@@ -109,7 +109,7 @@ def train(trainer, loader, device, val_it, validate, save_checkpoint, max_it, pr
 
             if (current_it % print_it == 0):
                 logfun({'loss': loss}, step=current_it)
-            
+
             trainer.update()
             current_it += 1
             pbar.set_postfix({"loss": loss, "epoch": current_epoch, "it": current_it})
@@ -119,7 +119,7 @@ def train(trainer, loader, device, val_it, validate, save_checkpoint, max_it, pr
         current_epoch += 1
 
 
-@hydra.main(config_path="config", config_name="config")
+@hydra.main(config_path="../config", config_name="config")
 def main(cfg):
 
     if cfg.logging == "wandb":
@@ -151,7 +151,7 @@ def main(cfg):
         # Does not load previous iteration count
         logger.info(f"Resuming from {cfg.resume}")
         trainer.load_state_dict(torch.load(cfg.resume, map_location="cpu")["state_dict"])
-    
+
     checkpoint_dir = f"checkpoints/{datetime.now():%Y%m%d-%H%M%S}"
     checkpointer = Checkpointer(checkpoint_dir, cfg.train.val_it)
     validate = partial(validation,

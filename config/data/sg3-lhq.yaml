@@ -1,8 +1,8 @@
 bs: 512
 format: webdataset
 path: data/webdataset/sg3-lhq-256-clip/{00000..99}.tar
-embed_noise_scale: 0.75
-sg_pkl: '/home/jpinkney/code/clip2latent/data/models/lhq-256-stylegan3-t-25Mimg.pkl'
+embed_noise_scale: 1.0
+sg_pkl: 'https://huggingface.co/justinpinkney/stylegan3-t-lhq-256/resolve/main/lhq-256-stylegan3-t-25Mimg.pkl'
 clip_variant: "ViT-B/32"
 n_latents: 1
 latent_dim: 512
