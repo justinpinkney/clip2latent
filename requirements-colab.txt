@@ -1,0 +1,9 @@
+wandb==0.12.16
+ninja==1.10.2.3
+dalle2-pytorch==0.2.38
+hydra-core==1.1.2
+typer==0.4.1
+joblib==1.1.0
+webdataset==0.2.5
+gradio==3.4
+protobuf==3.20.1
