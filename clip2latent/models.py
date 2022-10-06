@@ -16,6 +16,10 @@ def load_sg(network_pkl):
     import sys
     code_folder = Path(__file__).parent
     sg3_path = str(code_folder/"stylegan3")
+    print("---------")
+    print(sg3_path)
+    print(list(sg3_path.glob("*")))
+    print("---------")          
     sys.path.append(sg3_path)
     import dnnlib
     import legacy
