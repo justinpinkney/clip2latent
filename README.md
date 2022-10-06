@@ -1,6 +1,6 @@
 # clip2latent - Official PyTorch Code
 
-[![Open Arxiv](https://img.shields.io/badge/arXiv-tbc.tbc-b31b1b.svg)](TODO)
+[![Open Arxiv](https://img.shields.io/badge/arXiv-2210.02347-b31b1b.svg)](https://arxiv.org/abs/2210.02347)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/justinpinkney/clip2latent/blob/main/demo.ipynb)
 
 ![](images/headline-large.jpeg)
@@ -162,6 +162,22 @@ For more details please refer to the [hydra documentation](https://hydra.cc/docs
 
 Training is set up to run on a single GPU and does not currently support multigpu training. The default settings will take around 18 hours to train on a single A100-80GB, although the best checkpoint is likely to occur within 10 hours of training.
 
+## Acknowledgements
+
+- This code uses [lucidrains](https://github.com/lucidrains)' implementation of the [dalle2 prior](https://github.com/lucidrains/DALLE2-pytorch).
+- Compute for training was provided by [Lambda GPU Cloud](https://lambdalabs.com/service/gpu-cloud).
+
 ## Citation
 
-TODO
+```
+@misc{https://doi.org/10.48550/arxiv.2210.02347,
+  doi = {10.48550/ARXIV.2210.02347},
+  url = {https://arxiv.org/abs/2210.02347},
+  author = {Pinkney, Justin N. M. and Li, Chuan},
+  keywords = {Computer Vision and Pattern Recognition (cs.CV), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {clip2latent: Text driven sampling of a pre-trained StyleGAN using denoising diffusion and CLIP},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+```
