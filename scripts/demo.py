@@ -113,8 +113,6 @@ css = """
         }
 """
 
-block = gr.Blocks(css=css)
-
 examples = [
     [
         'a photograph of a happy person wearing sunglasses by the sea',
@@ -142,69 +140,95 @@ examples = [
     ],
 ]
 
-with block:
-    gr.HTML(
-        """
-            <div style="text-align: center; max-width: 650px; margin: 0 auto;">
-              <div>
-                <img class="logo" src="https://lambdalabs.com/static/images/lambda-logo.svg" alt="Lambda Logo"
-                    style="margin: auto; max-width: 7rem;">
-                <h1 style="font-weight: 900; font-size: 3rem;">
-                  clip2latent
-                </h1>
-              </div>
-              <p style="margin-bottom: 10px; font-size: 94%">
-                Official demo for <em>clip2latent: Text driven sampling of a pre-trained StyleGAN using denoising diffusion and CLIP</ em>, accepted to BMVC 2022
-              </p>
-            </div>
-        """
-    )
-    with gr.Group():
-        with gr.Box():
-            with gr.Row().style(mobile_collapse=False, equal_height=True):
-                text = gr.Textbox(
-                    label="Enter your prompt",
-                    show_label=False,
-                    max_lines=1,
-                    placeholder="Enter your prompt",
-                ).style(
-                    border=(True, False, True, True),
-                    rounded=(True, False, False, True),
-                    container=False,
-                )
-                btn = gr.Button("Generate image").style(
-                    margin=False,
-                    rounded=(False, True, True, False),
-                )
+def main():
+    block = gr.Blocks(css=css)
 
-        gallery = gr.Gallery(
-            label="Generated images", show_label=False, elem_id="gallery"
-        ).style(grid=[2], height="auto")
-
-
-        with gr.Row(elem_id="advanced-options"):
-            model_select = gr.Dropdown(label="Model", choices=["faces", "landscape"], value="faces",)
-            samples = gr.Slider(label="Images", minimum=1, maximum=4, value=2, step=1)
-            scale = gr.Slider(
-                label="Guidance Scale", minimum=0, maximum=10, value=2, step=0.5
-            )
-
-
-        ex = gr.Examples(examples=examples, fn=infer, inputs=[text, model_select, samples, scale], outputs=gallery, cache_examples=False)
-        ex.dataset.headers = [""]
-
-        text.submit(infer, inputs=[text, model_select, samples, scale], outputs=gallery)
-        btn.click(infer, inputs=[text, model_select, samples, scale], outputs=gallery)
+    with block:
         gr.HTML(
             """
-                <div class="footer">
-                    <p> Gradio Demo by Lambda Labs
-                    </p>
+                <div style="text-align: center; max-width: 650px; margin: 0 auto;">
+                <div>
+                    <img class="logo" src="https://lambdalabs.com/static/images/lambda-logo.svg" alt="Lambda Logo"
+                        style="margin: auto; max-width: 7rem;">
+                    <h1 style="font-weight: 900; font-size: 3rem;">
+                    clip2latent
+                    </h1>
                 </div>
-                <div class="acknowledgments">
-                    <p>Todo</p>
-               </div>
-           """
+                <p style="font-size: 94%">
+                    Official demo for <em>clip2latent: Text driven sampling of a pre-trained StyleGAN using denoising diffusion and CLIP</em>, accepted to BMVC 2022
+                </p>
+                <p style="margin-bottom: 10px; font-size: 94%">
+                    Get the <a href="https://github.com/justinpinkney/clip2latent">code on GitHub</a>, see the <a href="#">paper on Arxiv</a>.
+                </p>
+                </div>
+            """
         )
+        with gr.Group():
+            with gr.Box():
+                with gr.Row().style(mobile_collapse=False, equal_height=True):
+                    text = gr.Textbox(
+                        label="Enter your prompt",
+                        show_label=False,
+                        max_lines=1,
+                        placeholder="Enter your prompt",
+                    ).style(
+                        border=(True, False, True, True),
+                        rounded=(True, False, False, True),
+                        container=False,
+                    )
+                    btn = gr.Button("Generate image").style(
+                        margin=False,
+                        rounded=(False, True, True, False),
+                    )
 
-block.launch()
+            gallery = gr.Gallery(
+                label="Generated images", show_label=False, elem_id="gallery"
+            ).style(grid=[2], height="auto")
+
+
+            with gr.Row(elem_id="advanced-options"):
+                model_select = gr.Dropdown(label="Model", choices=["faces", "landscape"], value="faces",)
+                samples = gr.Slider(label="Images", minimum=1, maximum=4, value=2, step=1)
+                scale = gr.Slider(
+                    label="Guidance Scale", minimum=0, maximum=10, value=2, step=0.5
+                )
+
+
+            ex = gr.Examples(examples=examples, fn=infer, inputs=[text, model_select, samples, scale], outputs=gallery, cache_examples=False)
+            ex.dataset.headers = [""]
+
+            text.submit(infer, inputs=[text, model_select, samples, scale], outputs=gallery)
+            btn.click(infer, inputs=[text, model_select, samples, scale], outputs=gallery)
+            gr.HTML(
+                """
+                    <div class="footer">
+                        <p> Gradio Demo by Lambda Labs
+                        </p>
+                    </div>
+                    <div class="acknowledgments">
+                        <img src="https://raw.githubusercontent.com/justinpinkney/clip2latent/main/images/headline-large.jpeg"></img>
+                        <br>
+                        <h2 style="font-size:1.5em">clip2latent: Text driven sampling of a pre-trained StyleGAN using denoising diffusion and CLIP</h2>
+                        <p>Justin N. M. Pinkney and Chuan Li @ <a href="https://lambdalabs.com/">Lambda Inc.</a>
+                        <br>
+                        <br>
+                        <em>Abstract:</em>
+                        We introduce a new method to efficiently create text-to-image models from a pre-trained CLIP and StyleGAN.
+                        It enables text driven sampling with an existing generative model without any external data or fine-tuning.
+                        This is achieved by training a diffusion model conditioned on CLIP embeddings to sample latent vectors of a pre-trained StyleGAN, which we call <em>clip2latent</em>.
+                        We leverage the alignment between CLIP’s image and text embeddings to avoid the need for any text labelled data for training the conditional diffusion model.
+                        We demonstrate that clip2latent allows us to generate high-resolution (1024x1024 pixels) images based on text prompts with fast sampling, high image quality, and low training compute and data requirements.
+                        We also show that the use of the well studied StyleGAN architecture, without further fine-tuning, allows us to directly apply existing methods to control and modify the generated images adding a further layer of control to our text-to-image pipeline.
+                        </p>
+                        <br>
+                        <p>Trained using <a href="https://lambdalabs.com/service/gpu-cloud">Lambda GPU Cloud</a></p>
+                </div>
+            """
+            )
+
+    block.queue()
+    block.launch()
+
+
+if __name__ == "__main__":
+    main()

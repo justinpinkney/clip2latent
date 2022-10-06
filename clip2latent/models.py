@@ -7,13 +7,16 @@ from dalle2_pytorch.train import DiffusionPriorTrainer
 from torchvision import transforms
 from io import BytesIO
 import requests
+from pathlib import Path
 
 from clip2latent.latent_prior import LatentPrior, WPlusPriorNetwork
 
 
 def load_sg(network_pkl):
     import sys
-    sys.path.append("stylegan3")
+    code_folder = Path(__file__).parent.parent
+    sg3_path = str(code_folder/"stylegan3")
+    sys.path.append(sg3_path)
     import dnnlib
     import legacy
 

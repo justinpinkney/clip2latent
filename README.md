@@ -28,7 +28,7 @@ pip install -r requirements.txt
 
 ### Inference
 
-To run the models for inference the simplest way is to start the gradio demo:
+To run the models for inference the simplest way is to start the gradio demo (or run it [in Colab](https://colab.research.google.com/github/justinpinkney/clip2latent/blob/demo/colab-gradio.ipynb)):
 
 ```bash
 python scripts/demo.py
