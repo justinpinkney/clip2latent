@@ -6,5 +6,5 @@ setup(
     version='1.0',
     description='Official code for clip2latent',
     author='Justin Pinkney',
-    package_data = {'clip2latent/clip2latent/stylegan3': ['*']}
+    package_data = {'clip2latent': ['stylegan3/*']}
 )
