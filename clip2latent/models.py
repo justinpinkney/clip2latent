@@ -14,7 +14,7 @@ from clip2latent.latent_prior import LatentPrior, WPlusPriorNetwork
 
 def load_sg(network_pkl):
     import sys
-    code_folder = Path(__file__).parent.parent
+    code_folder = Path(__file__).parent
     sg3_path = str(code_folder/"stylegan3")
     sys.path.append(sg3_path)
     import dnnlib
