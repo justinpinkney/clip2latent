@@ -2,6 +2,7 @@
 
 [![Open Arxiv](https://img.shields.io/badge/arXiv-2210.02347-b31b1b.svg)](https://arxiv.org/abs/2210.02347)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/justinpinkney/clip2latent/blob/main/demo.ipynb)
+[![Open in Spaces](https://img.shields.io/badge/%F0%9F%A4%97-Open%20in%20Spaces-orange)](https://huggingface.co/spaces/lambdalabs/clip2latent-demo)
 
 ![](images/headline-large.jpeg)
 
